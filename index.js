@@ -1,8 +1,13 @@
 require('dotenv').config(); // Load environment variables
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode');
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const express = require('express'); // Add express to serve the QR code as a URL
+
+// Create an Express app to serve the QR code
+const app = express();
+let qrCodeUrl = ''; // Store the QR code URL
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, {
@@ -58,12 +63,12 @@ const personalData = {
             "Supportive",
             "Tech-savvy",
             "Curious"
-        ],
+        ]
     },
     contact: {
         phoneNumber: "+254700000000", // Replace with Maurine's phone number
     },
-    botName: "Maurine-4o",
+    botName: "Maurine-4o"
 };
 
 // WhatsApp Client setup
@@ -76,9 +81,23 @@ const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // QR code generation event for WhatsApp connection
-client.on('qr', (qr) => {
-    qrcode.generate(qr, { small: true });
-    console.log('QR Code generated. Scan it with your WhatsApp app.');
+client.on('qr', async (qr) => {
+    try {
+        // Generate QR code as a Data URL
+        qrCodeUrl = await qrcode.toDataURL(qr);
+        console.log('QR Code generated. Access it at http://localhost:3000/qr');
+    } catch (error) {
+        console.error('Error generating QR code:', error);
+    }
+});
+
+// Serve the QR code via Express
+app.get('/qr', (req, res) => {
+    if (qrCodeUrl) {
+        res.send(`<img src="${qrCodeUrl}" alt="WhatsApp QR Code" />`);
+    } else {
+        res.send('QR code not available yet. Please try again.');
+    }
 });
 
 // Client ready event
@@ -180,3 +199,9 @@ client.on('message', async (message) => {
 
 // Initialize the WhatsApp client
 client.initialize();
+
+// Start the Express server
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+});
